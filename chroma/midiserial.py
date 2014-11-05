@@ -1,6 +1,6 @@
 import threading
 
-import rtmidi
+import rtmidi_python as rtmidi
 
 import engine
 
@@ -8,7 +8,7 @@ import engine
 class MidiInput(object):
 	def __init__(self):
 		self._midiin = rtmidi.MidiIn()
-		port_names = self._midiin.get_ports()
+		port_names = self._midiin.ports
 		assert port_names, "No MIDI input ports found"
 		if len(port_names) == 1:
 			idx = 0
@@ -23,9 +23,9 @@ class MidiInput(object):
 
 	def run(self):
 		while True:
-			message = self._midiin.get_message()
+			(message, delta_time) = self._midiin.get_message()
 			if message:
-				self._callback(message)
+				self._callback((message, delta_time))
 
 	def start(self):
 		self.thread = threading.Thread(target=self.run, name="MIDI input")
