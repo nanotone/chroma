@@ -75,7 +75,7 @@ def main(args):
     read_thread.start()
 
     try:
-        match = re.search(r'Resolution:\s*(\d+) x (\d+)',
+        match = re.search(r'Resolution:\s*(\d+) [Xx] (\d+)',
                           subprocess.check_output(['system_profiler', 'SPDisplaysDataType']))
         (width, height) = [int(match.group(i)) for i in (1, 2)]
         print "Creating GLFW app"
