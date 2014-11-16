@@ -54,7 +54,10 @@ class SMFReader(MidiOutStream):
         self.quarters_per_tick = 1.0 / division
 
     def note_on(self, channel=0, note=0x40, velocity=0x40):
-        self.events.append((self.abs_time(), channel, NOTE_ON, note, velocity))
+        if velocity:
+            self.events.append((self.abs_time(), channel, NOTE_ON, note, velocity))
+        else:
+            self.events.append((self.abs_time(), channel, NOTE_OFF, note))
 
     def note_off(self, channel=0, note=0x40, velocity=0x40):
         self.events.append((self.abs_time(), channel, NOTE_OFF, note))
@@ -102,22 +105,30 @@ class SMFReader(MidiOutStream):
 
 
 def main(args):
-    if args.dst:
-        addr = pipeutil.parse_addr(args.dst)
-        emit = pipeutil.udpsock_serializer(addr)
-    else:
-        emit = pipeutil.stdout_serializer()
-    if args.src:
-        runner = SMFReader(args.src, emit)
-    else:
+    sinks = []
+    for dst in args.dst:
+        if dst == '-':
+            sinks.append(pipeutil.StdoutSerializer())
+        elif ':' in dst:
+            addr = pipeutil.parse_addr(dst)
+            sinks.append(pipeutil.UDPSerializer(addr))
+        else:
+            sinks.append(pipeutil.SMFWriter(dst))
+    def emit(*a, **k):
+        for s in sinks: s.emit(*a, **k)
+    if args.src == '-':
         runner = RtMidiListener(emit)
-    import time; time.sleep(3)
-    runner.run()
+    else:
+        runner = SMFReader(args.src, emit)
+    try:
+        runner.run()
+    finally:
+        for s in sinks: s.eof()
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--src', help="path to .mid file (omit to use realtime MIDI)")
-    parser.add_argument('--dst', help="[hostname]:port (omit to use stdout)")
+    parser.add_argument('src', help=".mid path OR - (for realtime MIDI)")
+    parser.add_argument('dst', nargs='*', help="[hostname]:port OR .mid path OR - (for stdout)")
     main(parser.parse_args())
