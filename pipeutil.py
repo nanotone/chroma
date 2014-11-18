@@ -61,7 +61,7 @@ class SMFWriter(object):
                 mof.note_off(note=e['args'][0])
             elif e['code'] == 0xB0:
                 #e['args'][0] /= 4  # garageband
-                mof.continuous_controller(channel=0, controller=0x40, value=e['args'][0])
+                mof.continuous_controller(channel=0, controller=e['args'][0], value=e['args'][1])
         mof.update_time(self.division)
         mof.end_of_track()
         mof.eof()

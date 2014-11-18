@@ -88,7 +88,8 @@ class Engine(object):
             self.reverb_center[1] += coords[1]
             del self.notes[midipitch]
 
-    def damper(self, midipitch, state):
+    def damper(self, controller, state):
+        if controller != 0x40: return  # only handle sustain pedal for now
         state /= 127.0
         if state < self.damper_level:
             if state:

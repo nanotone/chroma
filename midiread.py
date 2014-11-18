@@ -64,8 +64,8 @@ class SMFReader(MidiOutStream):
         self.events.append((self.abs_time(), channel, NOTE_OFF, note))
 
     def continuous_controller(self, channel, controller, value):
-        if controller == 0x40:
-            self.events.append((self.abs_time(), channel, DAMPER, value))
+        if controller in (0x40, 0x43):
+            self.events.append((self.abs_time(), channel, DAMPER, controller, value))
 
     def tempo(self, value):
         self.tempi.append([self.abs_time(), value * self.quarters_per_tick])
