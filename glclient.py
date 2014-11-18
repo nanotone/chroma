@@ -3,6 +3,7 @@ import logging
 import math
 import re
 import subprocess
+import time
 import threading
 
 from OpenGL.GL import *
@@ -27,32 +28,45 @@ def init_gl(width, height):
 
 engine_lock = threading.Lock()
 
-def render_frame():
-    glClear(GL_COLOR_BUFFER_BIT)
-    glLoadIdentity()
-    with engine_lock:
-        engine.tick()
-        midi_engine.update_notes()
-        glBegin(GL_QUADS)
-        for (midipitch, note) in midi_engine.notes.items():
-            pitch = midipitch - 21
-            (minx, maxx) = (pitch / 44. - 1, (pitch + 1) / 44. - 1)
-            r = math.hypot(*note.pos)
-            (f, pc1) = math.modf(math.atan2(note.pos[1], note.pos[0]) / engine.PC_RADS + 12)
-            pc1 = int(pc1)
-            color = engine.weighted_avg_colors(RGB_COLORS[ pc1  % 12],
-                                               RGB_COLORS[(pc1+1)%12],
-                                               1 - f)
-            if r < 1.0:
-                color = engine.weighted_avg_colors(color, [0.75, 0.75, 0.75], r)
-            weight = note.decay * note.volume ** 0.3
-            color = [min(c * weight, 1) for c in color]
-            glColor3f(*color)
-            glVertex3f(minx, -1., 0.)
-            glVertex3f(maxx, -1., 0.)
-            glVertex3f(maxx,  1., 0.)
-            glVertex3f(minx,  1., 0.)
-        glEnd()
+class Renderer(object):
+    def __init__(self):
+        self.last_update = 0
+
+    def render_frame(self):
+        glClear(GL_COLOR_BUFFER_BIT)
+        glLoadIdentity()
+        with engine_lock:
+            if midi_engine.notes_need_update or time.time() - self.last_update > 0.05:
+                engine.tick()
+                (cx, cy) = midi_engine.get_center()
+                scale = 1.2 / (math.hypot(cx, cy) + 1)
+                (cx, cy) = (scale * cx, scale * cy)
+                for note in midi_engine.notes.itervalues():
+                    note.render_age = engine.now - note.start
+                    note.render_decay = math.exp(-note.render_age * 0.5) * note.damper_level
+                    note.render_pos = (note.pitch_coords[0] + cx, note.pitch_coords[1] + cy)
+                self.notes_updated = engine.now
+                midi_engine.notes_need_update = False
+            glBegin(GL_QUADS)
+            for (midipitch, note) in midi_engine.notes.items():
+                pitch = midipitch - 21
+                (minx, maxx) = (pitch / 44. - 1, (pitch + 1) / 44. - 1)
+                r = math.hypot(*note.render_pos)
+                (f, pc1) = math.modf(math.atan2(note.render_pos[1], note.render_pos[0]) / engine.PC_RADS + 12)
+                pc1 = int(pc1)
+                color = engine.weighted_avg_colors(RGB_COLORS[ pc1  % 12],
+                                                   RGB_COLORS[(pc1+1)%12],
+                                                   1 - f)
+                if r < 1.0:
+                    color = engine.weighted_avg_colors(color, [0.75, 0.75, 0.75], r)
+                weight = note.render_decay * note.volume ** 0.3
+                color = [min(c * weight, 1) for c in color]
+                glColor3f(*color)
+                glVertex3f(minx, -1., 0.)
+                glVertex3f(maxx, -1., 0.)
+                glVertex3f(maxx,  1., 0.)
+                glVertex3f(minx,  1., 0.)
+            glEnd()
 
 midi_engine = engine.Engine()
 def midi_cb(code, *args):
@@ -86,7 +100,7 @@ def main(args):
         return
     init_gl(width, height)
     logging.info("Entering render loop")
-    app.run(render_frame)
+    app.run(Renderer().render_frame)
 
 
 if __name__ == '__main__':

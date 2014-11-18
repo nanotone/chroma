@@ -115,16 +115,3 @@ class Engine(object):
             else:
                 self.delete_note(midipitch)
 
-    def update_notes(self):
-        if now - self.notes_updated < 0.05 and not self.notes_need_update:
-            return
-        (cx, cy) = self.get_center()
-        scale = 1.2 / (math.hypot(cx, cy) + 1)
-        (cx, cy) = (scale * cx, scale * cy)
-        for note in self.notes.itervalues():
-            note.age = now - note.start
-            note.decay = math.exp(-note.age * TIME_SCALE) * note.damper_level
-            note.pos = (note.pitch_coords[0] + cx, note.pitch_coords[1] + cy)
-        self.notes_updated = now
-        self.notes_need_update = False
-
