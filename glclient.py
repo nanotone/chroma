@@ -1,4 +1,5 @@
 import argparse
+import logging
 import math
 import re
 import subprocess
@@ -66,7 +67,7 @@ def main(args):
     if args.src:
         (hostname, port) = pipeutil.parse_addr(args.src, fill_localhost=False)
         if hostname:
-            print "Source address cannot specify hostname"
+            logging.error("Source address cannot specify hostname")
             return
         read_thread = threading.Thread(target=pipeutil.run_udpsock_deserializer, args=(port, midi_cb))
     else:
@@ -78,13 +79,13 @@ def main(args):
         match = re.search(r'Resolution:\s*(\d+) [Xx] (\d+)',
                           subprocess.check_output(['system_profiler', 'SPDisplaysDataType']))
         (width, height) = [int(match.group(i)) for i in (1, 2)]
-        print "Creating GLFW app"
+        logging.info("Creating GLFW app")
         app = glfw_app.GlfwApp("Chroma Key", width, height, args.fullscreen)
     except glfw_app.GlfwError as e:
-        print e.message
+        logging.error(e.message)
         return
     init_gl(width, height)
-    print "Entering render loop"
+    logging.info("Entering render loop")
     app.run(render_frame)
 
 

@@ -31,20 +31,29 @@ class Note(object):
         self.pitch_coords = coords_for_midipitch(midipitch)
         self.start = now      # when note_on happened
         self.volume = volume  # original volume. everything eventually gets multiplied by this
-        self.damp_start = 0
-        self.damp_level = 1.0
+        self.damper_start = 0
+        self.damper_level = 1.0
         self.accum = 1.0
 
-    def release_with_damper(self, damp_level):
-        self.damp_level = damp_level
+    def release_with_damper(self, damper_level):
+        self.damper_level = damper_level
         self.accum += (now - self.start) * TIME_SCALE
-        self.damp_start = now
+        self.damper_start = now
 
     def set_damper(self, level):
-        if self.damp_start and level < self.damp_level:
-            self.accum += (now - self.damp_start) * TIME_SCALE * self.damp_level
-            self.damp_level = level
-            self.damp_start = now
+        if self.damper_start and level < self.damper_level:
+            self.accum += (now - self.damper_start) * TIME_SCALE * self.damper_level
+            self.damper_level = level
+            self.damper_start = now
+
+    def get_decayed_coords(self):
+        total_age = (now - self.start) * TIME_SCALE
+        if self.damper_start:
+            elapsed = (now - self.damper_start) * TIME_SCALE
+        else:
+            elapsed = total_age
+        weight = math.exp(-total_age) * (self.accum + self.damper_level * elapsed) * self.volume
+        return (self.pitch_coords[0] * weight, self.pitch_coords[1] * weight)
 
 
 class Engine(object):
@@ -64,28 +73,20 @@ class Engine(object):
             self.reverb_center[1] *= decay_factor
             self.reverb_center_updated = now
 
-    def get_active_note_pos(self, midipitch):
-        note = self.notes[midipitch]
-        age = (now - note.start) * TIME_SCALE
-        elapsed = (now - note.damp_start) * TIME_SCALE if note.damp_start else age
-        weight = math.exp(-age) * (note.accum + note.damp_level * elapsed) * note.volume
-        return (note.pitch_coords[0] * weight, note.pitch_coords[1] * weight)
-
     def get_center(self):
-        note_positions = [self.get_active_note_pos(midipitch) for midipitch in self.notes]
-        (x, y) = map(sum, zip(*note_positions)) if note_positions else (0, 0)
         self.decay_reverb_center()
-        (x, y) = (x + self.reverb_center[0], y + self.reverb_center[1])
-        scale = math.log1p(math.hypot(x, y)) * 0.21
-        return (scale * x, scale * y)
+        coords = [note.get_decayed_coords() for note in self.notes.itervalues()] + [self.reverb_center]
+        return map(sum, zip(*coords))
 
     def delete_note(self, midipitch):
         # add finished note to reverb
-        note_pos = self.get_active_note_pos(midipitch)
-        self.decay_reverb_center()
-        self.reverb_center[0] += note_pos[0]
-        self.reverb_center[1] += note_pos[1]
-        del self.notes[midipitch]
+        note = self.notes.get(midipitch)
+        if note:
+            coords = note.get_decayed_coords()
+            self.decay_reverb_center()
+            self.reverb_center[0] += coords[0]
+            self.reverb_center[1] += coords[1]
+            del self.notes[midipitch]
 
     def damper(self, midipitch, state):
         state /= 127.0
@@ -95,7 +96,7 @@ class Engine(object):
                     note.set_damper(state)
             else:  # sec
                 for (midipitch, note) in self.notes.items():
-                    if note.damp_start:
+                    if note.damper_start:
                         self.delete_note(midipitch)
         self.damper_level = state
 
@@ -117,12 +118,13 @@ class Engine(object):
     def update_notes(self):
         if now - self.notes_updated < 0.05 and not self.notes_need_update:
             return
-        center = self.get_center()
-        for (midipitch, note) in self.notes.iteritems():
+        (cx, cy) = self.get_center()
+        scale = 1.2 / (math.hypot(cx, cy) + 1)
+        (cx, cy) = (scale * cx, scale * cy)
+        for note in self.notes.itervalues():
             note.age = now - note.start
-            note.decay = math.exp(-note.age * TIME_SCALE) * note.damp_level
-            note.pos = (note.pitch_coords[0] + center[0],
-                        note.pitch_coords[1] + center[1])
+            note.decay = math.exp(-note.age * TIME_SCALE) * note.damper_level
+            note.pos = (note.pitch_coords[0] + cx, note.pitch_coords[1] + cy)
         self.notes_updated = now
         self.notes_need_update = False
 

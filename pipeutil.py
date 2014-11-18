@@ -55,12 +55,12 @@ class SMFWriter(object):
             mof.update_time(next_tick - tick)
             tick = next_tick
             if e['code'] == 0x90:
-                #e['args'][1] /= 2
+                #e['args'][1] /= 2  # garageband
                 mof.note_on(note=e['args'][0], velocity=e['args'][1])
             elif e['code'] == 0x80:
                 mof.note_off(note=e['args'][0])
             elif e['code'] == 0xB0:
-                #e['args'][0] /= 4
+                #e['args'][0] /= 4  # garageband
                 mof.continuous_controller(channel=0, controller=0x40, value=e['args'][0])
         mof.update_time(self.division)
         mof.end_of_track()

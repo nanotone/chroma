@@ -1,5 +1,6 @@
 import bisect
 import json
+import logging
 import socket
 import sys
 import time
@@ -21,11 +22,11 @@ class RtMidiListener(object):
         self.mi = rtmidi.MidiIn()
         ports = self.mi.ports
         if not ports:
-            print "No MIDI input ports found"
+            logging.warning("No MIDI input ports found")
             sys.exit()
         if len(ports) == 1:
             idx = 0
-            print "Choosing MIDI input port", ports[0]
+            logging.info("Choosing MIDI input port %s", ports[0])
         else:
             print "MIDI input ports:"
             for (idx, name) in enumerate(ports):
