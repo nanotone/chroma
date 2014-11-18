@@ -76,7 +76,9 @@ class SMFReader(MidiOutStream):
     def eof(self):
         self.tempi.sort()
         self.events.sort()
-        assert self.tempi[0][0] == 0, "No tempo found at tick=0 in MIDI file"
+        if not (self.tempi and self.tempi[0][0] == 0):
+            logging.warning("No tempo found at tick=0 in MIDI file")
+            self.tempi.insert(0, [0, 500000 * self.quarters_per_tick])  # 0.5 sec per quarter
         (prev_tick, prev_time, micros_per_tick) = (0, 0, 0)
         for tempo in self.tempi:
             tick = tempo[0]
