@@ -40,10 +40,10 @@ class Note(object):
         self.accum += (now - self.start) * TIME_SCALE
         self.damper_start = now
 
-    def set_damper(self, level):
-        if self.damper_start and level < self.damper_level:
+    def set_damper(self, damper_level):
+        if self.damper_start and damper_level < self.damper_level:
             self.accum += (now - self.damper_start) * TIME_SCALE * self.damper_level
-            self.damper_level = level
+            self.damper_level = damper_level
             self.damper_start = now
 
     def get_decayed_coords(self):

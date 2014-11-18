@@ -22,8 +22,8 @@ RGB_COLORS = map(rgb_from_hexcolor, HEXCOLORS)
 def init_gl(width, height):
     glMatrixMode(GL_PROJECTION)  # set viewing projection
     glLoadIdentity()
-    ratio = 1.0  #float(width) / height
-    glOrtho(-ratio, ratio, -1.0, 1.0, 1.0, -1.0)
+    #ratio = 1.0  #float(width) / height
+    glOrtho(0.0, 1.0, -1.0, 1.0, 1.0, -1.0)
     glMatrixMode(GL_MODELVIEW)  # return to position viewer
 
 engine_lock = threading.Lock()
@@ -31,6 +31,7 @@ engine_lock = threading.Lock()
 class Renderer(object):
     def __init__(self):
         self.last_update = 0
+        self.top_2nd_note_weight = 0.3
 
     def render_frame(self):
         glClear(GL_COLOR_BUFFER_BIT)
@@ -41,16 +42,23 @@ class Renderer(object):
                 (cx, cy) = midi_engine.get_center()
                 scale = 1.2 / (math.hypot(cx, cy) + 1)
                 (cx, cy) = (scale * cx, scale * cy)
+                note_weights = [0]
                 for note in midi_engine.notes.itervalues():
                     note.render_age = engine.now - note.start
                     note.render_decay = math.exp(-note.render_age * 0.5) * note.damper_level
                     note.render_pos = (note.pitch_coords[0] + cx, note.pitch_coords[1] + cy)
-                self.notes_updated = engine.now
+                    note_weights.append(note.render_decay * note.volume)
+                elapsed = engine.now - self.last_update
+                note_weights.sort()
+                top_2nd_note_weight = note_weights[-2] if len(note_weights) >= 2 else note_weights[-1] * 0.9
+                self.top_2nd_note_weight = max(self.top_2nd_note_weight * math.exp(-elapsed/5.0),
+                                               top_2nd_note_weight, 0.3)
+                self.last_update = engine.now
                 midi_engine.notes_need_update = False
             glBegin(GL_QUADS)
             for (midipitch, note) in midi_engine.notes.items():
                 pitch = midipitch - 21
-                (minx, maxx) = (pitch / 44. - 1, (pitch + 1) / 44. - 1)
+                (minx, maxx) = (pitch / 88.0, (pitch + 1) / 88.0)
                 r = math.hypot(*note.render_pos)
                 (f, pc1) = math.modf(math.atan2(note.render_pos[1], note.render_pos[0]) / engine.PC_RADS + 12)
                 pc1 = int(pc1)
@@ -59,8 +67,13 @@ class Renderer(object):
                                                    1 - f)
                 if r < 1.0:
                     color = engine.weighted_avg_colors(color, [0.75, 0.75, 0.75], r)
-                weight = note.render_decay * note.volume ** 0.3
-                color = [min(c * weight, 1) for c in color]
+                # normalize weight to 2nd heaviest note, so top note gets voicing bonus
+                weight = note.render_decay * note.volume / self.top_2nd_note_weight
+                if weight < 1.0:
+                    # decay non-voiced notes slightly faster at attack-time
+                    color = [c * weight * math.exp(weight - 1) for c in color]
+                else:
+                    color = [min(c + (1-c)*(weight-1)/0.4, 1) for c in color]
                 glColor3f(*color)
                 glVertex3f(minx, -1., 0.)
                 glVertex3f(maxx, -1., 0.)
