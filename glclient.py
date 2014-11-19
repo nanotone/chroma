@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import logging
 import math
 import re
@@ -21,6 +22,13 @@ def rgb_from_hexcolor(hexcolor):
 RGB_COLORS = map(rgb_from_hexcolor, HEXCOLORS)
 
 engine_lock = threading.Lock()
+
+@contextlib.contextmanager
+def translated(x, y, z):
+    glPushMatrix()
+    glTranslatef(x, y, z)
+    yield
+    glPopMatrix()
 
 class Renderer(object):
     def __init__(self, width, height):
@@ -101,10 +109,8 @@ class Renderer(object):
         r = 1.3 * (0.97 ** pitch)
         r /= pitch / 88.0 + 1  # gradually make higher notes 2x closer/smaller
         size = r * 0.24
-        glPushMatrix()
-        glTranslatef(r * math.cos(theta), r * math.sin(theta), 0)
-        gluDisk(self.quadric, 0, size, 19, 1)
-        glPopMatrix()
+        with translated(r * math.cos(theta), r * math.sin(theta), 0):
+            gluDisk(self.quadric, 0, size, 19, 1)
 
     def request_update(self):
         if midi_engine.notes_need_update or time.time() - self.last_update > 0.03:
