@@ -27,24 +27,37 @@ class Renderer(object):
         self.height = height
         self.last_update = 0
         self.top_2nd_note_weight = 0.3
-        self.render_frame = lambda: None
+        self.visual_modes = "keyboard spiral".split()
 
-    def set_keyboard_viz(self):
-        self.viz = 'keyboard'
-        self.render_frame = self.render_keyboard
+    def key_cb(self, window, key, scancode, action, mods):
+        #print window, key, scancode, action, mods
+        if key == glfw_app.glfw.KEY_SPACE and action == glfw_app.glfw.PRESS:
+            self.set_viz((self.visual_modes.index(self.viz) + 1) % len(self.visual_modes))
+
+    def set_viz(self, viz):
+        if isinstance(viz, int):
+            viz = self.visual_modes[viz]
+        logging.info("Setting visualizer to '%s'", viz)
+        self.viz = viz
+        getattr(self, 'setup_' + viz)()
+
+    def setup_keyboard(self):
         glMatrixMode(GL_PROJECTION)  # set viewing projection
         glLoadIdentity()
         glOrtho(0.0, 1.0, 0.0, 1.0, 1.0, -1.0)
         glMatrixMode(GL_MODELVIEW)  # return to position viewer
 
-    def set_spiral_viz(self):
-        self.viz = 'spiral'
-        self.render_frame = self.render_spiral
+    def setup_spiral(self):
         glMatrixMode(GL_PROJECTION)  # set viewing projection
         glLoadIdentity()
         ratio = float(self.width) / self.height
         glOrtho(-ratio, ratio, -1.0, 1.0, 1.0, -1.0)
         glMatrixMode(GL_MODELVIEW)  # return to position viewer
+
+    def render_frame(self):
+        render = getattr(self, 'render_' + self.viz)
+        if render:
+            render()
 
     def render_keyboard(self):
         glClear(GL_COLOR_BUFFER_BIT)
@@ -162,8 +175,9 @@ def main(args):
         logging.error(e.message)
         return
     renderer = Renderer(width, height)
-    renderer.set_spiral_viz()
+    renderer.set_viz('spiral')
     logging.info("Entering render loop")
+    app.key_callbacks.append(renderer.key_cb)
     app.run(renderer.render_frame)
 
 
