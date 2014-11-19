@@ -26,6 +26,7 @@ class GlfwApp(object):
         try:
             frames_rendered = 0
             start = time.time()
+            fps = 0
             while not glfw.window_should_close(self.win):
                 render_frame()
                 glfw.swap_buffers(self.win)
@@ -33,7 +34,10 @@ class GlfwApp(object):
                 frames_rendered += 1
                 now = time.time()
                 if now - start >= 1.0:
-                    print "%.1f fps" % (frames_rendered / (now - start))
+                    new_fps = int(round(frames_rendered / (now - start)))
+                    if new_fps != fps:
+                        fps = new_fps
+                        print fps, "fps"
                     start = time.time()
                     frames_rendered = 0
         finally:

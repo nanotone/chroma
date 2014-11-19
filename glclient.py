@@ -37,7 +37,7 @@ class Renderer(object):
         glClear(GL_COLOR_BUFFER_BIT)
         glLoadIdentity()
         with engine_lock:
-            if midi_engine.notes_need_update or time.time() - self.last_update > 0.05:
+            if midi_engine.notes_need_update or time.time() - self.last_update > 0.03:
                 engine.tick()
                 (cx, cy) = midi_engine.get_center()
                 scale = 1.2 / (math.hypot(cx, cy) + 1)
@@ -87,7 +87,11 @@ def midi_cb(code, *args):
     with engine_lock:
         if code == 0x90 and args[1] == 0:  # sometimes note_off arrives as note_on with vel=0
             code = 0x80
-        getattr(midi_engine, {0x80: 'note_off', 0x90: 'note_on', 0xB0: 'damper'}[code])(*args)
+        func = getattr(midi_engine, {0x80: 'note_off', 0x90: 'note_on', 0xB0: 'damper'}[code], None)
+        if func:
+            func(*args)
+        else:
+            logging.warning("Unhandled MIDI event", code, args)
 
 
 def main(args):
