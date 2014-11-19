@@ -7,6 +7,7 @@ import time
 import threading
 
 from OpenGL.GL import *
+from OpenGL.GLU import *
 
 import engine
 import glfw_app
@@ -28,6 +29,7 @@ class Renderer(object):
         self.last_update = 0
         self.top_2nd_note_weight = 0.3
         self.visual_modes = "keyboard spiral".split()
+        self.quadric = gluNewQuadric()
 
     def key_cb(self, window, key, scancode, action, mods):
         #print window, key, scancode, action, mods
@@ -44,14 +46,14 @@ class Renderer(object):
     def setup_keyboard(self):
         glMatrixMode(GL_PROJECTION)  # set viewing projection
         glLoadIdentity()
-        glOrtho(0.0, 1.0, 0.0, 1.0, 1.0, -1.0)
+        gluOrtho2D(0.0, 1.0, 0.0, 1.0)
         glMatrixMode(GL_MODELVIEW)  # return to position viewer
 
     def setup_spiral(self):
         glMatrixMode(GL_PROJECTION)  # set viewing projection
         glLoadIdentity()
         ratio = float(self.width) / self.height
-        glOrtho(-ratio, ratio, -1.0, 1.0, 1.0, -1.0)
+        gluOrtho2D(-ratio, ratio, -1.0, 1.0)
         glMatrixMode(GL_MODELVIEW)  # return to position viewer
 
     def render_frame(self):
@@ -81,26 +83,28 @@ class Renderer(object):
         glLoadIdentity()
         with engine_lock:
             self.request_update()
-            glBegin(GL_QUADS)
-            glColor3f(.1, .1, .1)
-            for pitch in xrange(88):
-                self.draw_spiral_pitch(pitch)
+            pitches = set()
             for (midipitch, note) in midi_engine.notes.items():
                 pitch = midipitch - 21
                 color = self.get_note_color(midipitch, note)
+                color = [max(c, 0.07) for c in color]
                 glColor3f(*color)
                 self.draw_spiral_pitch(pitch)
-            glEnd()
+                pitches.add(pitch)
+            glColor3f(.07, .07, .07)
+            for pitch in set(xrange(88)) - pitches:
+                self.draw_spiral_pitch(pitch)
 
     def draw_spiral_pitch(self, pitch):
-        theta = 2*math.pi * 5.03/12 * pitch
-        rad = 0.97 ** pitch * 1.15 / (pitch/88.0 + 1)
-        (x, y) = (rad * math.cos(theta), rad * math.sin(theta))
-        rad *= 0.15
-        glVertex3f(x - rad, y - rad, 0.)
-        glVertex3f(x + rad, y - rad, 0.)
-        glVertex3f(x + rad, y + rad, 0.)
-        glVertex3f(x - rad, y + rad, 0.)
+        # use a logarithmic spiral, discretized to circle of fifths
+        theta = 2*math.pi * 5.03/12 * pitch  # skewed 5/12, so each pitch class also gets a slight spiral
+        r = 1.15 * (0.97 ** pitch)
+        r /= pitch / 88.0 + 1  # gradually make higher notes 2x closer/smaller
+        size = r * 0.15
+        glPushMatrix()
+        glTranslatef(r * math.cos(theta), r * math.sin(theta), 0)
+        gluDisk(self.quadric, 0, size, 17, 1)
+        glPopMatrix()
 
     def request_update(self):
         if midi_engine.notes_need_update or time.time() - self.last_update > 0.03:
