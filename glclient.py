@@ -87,23 +87,23 @@ class Renderer(object):
             for (midipitch, note) in midi_engine.notes.items():
                 pitch = midipitch - 21
                 color = self.get_note_color(midipitch, note)
-                color = [max(c, 0.07) for c in color]
+                color = [0.05 + 0.95 * c for c in color]
                 glColor3f(*color)
                 self.draw_spiral_pitch(pitch)
                 pitches.add(pitch)
-            glColor3f(.07, .07, .07)
+            glColor3f(.05, .05, .05)
             for pitch in set(xrange(88)) - pitches:
                 self.draw_spiral_pitch(pitch)
 
     def draw_spiral_pitch(self, pitch):
         # use a logarithmic spiral, discretized to circle of fifths
         theta = 2*math.pi * 5.03/12 * pitch  # skewed 5/12, so each pitch class also gets a slight spiral
-        r = 1.15 * (0.97 ** pitch)
+        r = 1.3 * (0.97 ** pitch)
         r /= pitch / 88.0 + 1  # gradually make higher notes 2x closer/smaller
-        size = r * 0.15
+        size = r * 0.24
         glPushMatrix()
         glTranslatef(r * math.cos(theta), r * math.sin(theta), 0)
-        gluDisk(self.quadric, 0, size, 17, 1)
+        gluDisk(self.quadric, 0, size, 19, 1)
         glPopMatrix()
 
     def request_update(self):
