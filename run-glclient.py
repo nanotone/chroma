@@ -11,8 +11,8 @@ from OpenGL.GLU import *
 
 import engine
 import glfw_app
-import pipeutil
 import simple_logging as logging
+import endpoints.pipe
 
 HEXCOLORS = ['#40FF40', '#00FFFF', '#20A0FF', '#4080FF', # G C
              '#8060FF', '#C040E0', '#FF0080', '#FF0040', # B M
@@ -164,16 +164,15 @@ def midi_cb(code, *args):
 
 
 def main(args):
-    read_thread = threading.Thread(target=pipeutil.run_stdin_deserializer, args=(midi_cb,))
+    read_thread = threading.Thread(target=endpoints.pipe.run_src, args=('', midi_cb,))
     read_thread.daemon = True
     read_thread.start()
-
     try:
         match = re.search(r'Resolution:\s*(\d+) [Xx] (\d+)',
                           subprocess.check_output(['system_profiler', 'SPDisplaysDataType']))
         (width, height) = [int(match.group(i)) for i in (1, 2)]
         logging.info("Creating GLFW app")
-        app = glfw_app.GlfwApp("Chroma Key", width, height, args.fullscreen)
+        app = glfw_app.GlfwApp("Chromatics", width, height, args.fullscreen)
     except glfw_app.GlfwError as e:
         logging.error(e.message)
         return
@@ -187,6 +186,5 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--src', help=":port (omit to use stdin)")
     parser.add_argument('--fullscreen', action='store_true')
     main(parser.parse_args())

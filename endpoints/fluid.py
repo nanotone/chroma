@@ -29,3 +29,7 @@ class FluidSynth(object):
 
     def eof(self):
         self.proc.stdin.close()
+
+
+def make_dst(arg):
+    return FluidSynth()

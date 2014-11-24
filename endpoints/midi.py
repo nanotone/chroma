@@ -26,3 +26,7 @@ class RtMidiListener(object):
             (message, delta_time) = self.mi.get_message()
             if message:
                 self.emit(*message)
+
+
+def run_src(arg, emit):
+    RtMidiListener(emit).run()
