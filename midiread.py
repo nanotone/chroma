@@ -11,35 +11,11 @@ from midi.MidiInFile import MidiInFile
 from midi.MidiOutStream import MidiOutStream
 
 import pipeutil
+import rtmidi_listener
 
 NOTE_OFF = 0x80
 NOTE_ON = 0x90
 DAMPER = 0xB0
-
-class RtMidiListener(object):
-    def __init__(self, emit):
-        self.emit = emit
-        self.mi = rtmidi.MidiIn()
-        ports = self.mi.ports
-        if not ports:
-            logging.warning("No MIDI input ports found")
-            sys.exit()
-        if len(ports) == 1:
-            idx = 0
-            logging.info("Choosing MIDI input port %s", ports[0])
-        else:
-            print "MIDI input ports:"
-            for (idx, name) in enumerate(ports):
-                print "%s. %s" % (idx, name)
-            idx = int(raw_input("Which MIDI input port? "))
-            assert 0 <= idx < len(ports)
-        self.mi.open_port(idx)
-
-    def run(self):
-        while True:
-            (message, delta_time) = self.mi.get_message()
-            if message:
-                self.emit(*message)
 
 
 class SMFReader(MidiOutStream):
@@ -107,24 +83,33 @@ class SMFReader(MidiOutStream):
             self.emit(event[2], *event[3:])
 
 
-def main(args):
-    sinks = []
-    for dst in args.dst:
-        if dst == '-':
-            sinks.append(pipeutil.StdoutSerializer())
-        elif ':' in dst:
-            addr = pipeutil.parse_addr(dst)
-            sinks.append(pipeutil.UDPSerializer(addr))
+def make_midi_dst(arg):
+    if arg == '-':
+        return pipeutil.StdoutSerializer()
+    if ':' in arg:
+        addr = pipeutil.parse_addr(arg)
+        return pipeutil.UDPSerializer(addr)
+    if arg.startswith('@'):
+        if arg == '@synth':
+            import fluidsynth
+            return fluidsynth.FluidSynth()
         else:
-            sinks.append(pipeutil.SMFWriter(dst))
+            logging.error("Unknown sink %s", arg)
+            sys.exit(1)
+    return pipeutil.SMFWriter(arg)
+
+
+def main(args):
+    sinks = map(make_midi_dst, args.dst)
     def emit(*a, **k):
         for s in sinks: s.emit(*a, **k)
-    if args.src == '-':
-        runner = RtMidiListener(emit)
-    else:
-        runner = SMFReader(args.src, emit)
     try:
-        runner.run()
+        if args.src == '@midi':
+            rtmidi_listener.RtMidiListener(emit).run()
+        if args.src == '-':
+            pipeutil.run_stdin_deserializer(emit)
+        else:
+            SMFReader(args.src, emit).run()
     finally:
         for s in sinks: s.eof()
 
@@ -132,6 +117,6 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('src', help=".mid path OR - (for realtime MIDI)")
-    parser.add_argument('dst', nargs='*', help="[hostname]:port OR .mid path OR - (for stdout)")
+    parser.add_argument('src', help=".mid file | - (stdin) | @midi (realtime)")
+    parser.add_argument('dst', nargs='*', help="- (stdout) | [hostname]:port | @synth (FluidSynth) | .mid file")
     main(parser.parse_args())
