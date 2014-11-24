@@ -1,9 +1,7 @@
 import bisect
-import json
 import logging
-import socket
-import sys
 import time
+import traceback
 
 import rtmidi_python as rtmidi
 
@@ -87,27 +85,45 @@ def make_midi_dst(arg):
     if arg == '-':
         return pipeutil.StdoutSerializer()
     if ':' in arg:
-        addr = pipeutil.parse_addr(arg)
-        return pipeutil.UDPSerializer(addr)
-    if arg.startswith('@'):
-        if arg == '@synth':
+        (scheme, arg) = arg.split(':', 1)
+        if scheme == 'udp':
+            addr = pipeutil.parse_addr(arg[2:])
+            return pipeutil.UDPSerializer(addr)
+        if scheme == 'fluid':
             import fluidsynth
             return fluidsynth.FluidSynth()
-        else:
-            logging.error("Unknown sink %s", arg)
-            sys.exit(1)
+        if scheme == 'glclient':
+            import glclient
+            return glclient.GLClient()
+        raise Exception("Unrecognized MIDI sink scheme " + scheme)
     return pipeutil.SMFWriter(arg)
 
 
 def main(args):
     sinks = map(make_midi_dst, args.dst)
     def emit(*a, **k):
-        for s in sinks: s.emit(*a, **k)
+        for s in sinks[:]:
+            try:
+                s.emit(*a, **k)
+            except Exception:
+                traceback.print_exc()
+                sinks.remove(s)
+                if not sinks:
+                    logging.warning("No more MIDI sinks!")
     try:
-        if args.src == '@midi':
-            rtmidi_listener.RtMidiListener(emit).run()
         if args.src == '-':
             pipeutil.run_stdin_deserializer(emit)
+        elif ':' in args.src:
+            (scheme, arg) = args.src.split(':', 1)
+            if scheme == 'midi':
+                rtmidi_listener.RtMidiListener(emit).run()
+            elif scheme == 'udp':
+                (hostname, port) = pipeutil.parse_addr(arg[2:])
+                if hostname:
+                    logging.warning("UDP source address should probably omit hostname")
+                pipeutil.run_udpsock_deserializer((hostname, port), emit)
+            else:
+                raise Exception("Unrecognized MIDI source scheme " + scheme)
         else:
             SMFReader(args.src, emit).run()
     finally:
@@ -117,6 +133,6 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('src', help=".mid file | - (stdin) | @midi (realtime)")
-    parser.add_argument('dst', nargs='*', help="- (stdout) | [hostname]:port | @synth (FluidSynth) | .mid file")
+    parser.add_argument('src', help="- (stdin) | .mid file | midi: (realtime)")
+    parser.add_argument('dst', nargs='*', help="- (stdout) | .mid file | udp://HOST | fluid:")
     main(parser.parse_args())

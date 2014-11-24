@@ -6,11 +6,9 @@ import time
 from midi.MidiOutFile import MidiOutFile
 
 
-def parse_addr(addr, fill_localhost=True):
+def parse_addr(addr):
     try:
         (hostname, port) = addr.split(':')
-        if fill_localhost and not hostname:
-            hostname = '127.0.0.1'
         return (hostname, int(port))
     except ValueError:
         raise ValueError(addr + " does not look like an address")
@@ -18,7 +16,10 @@ def parse_addr(addr, fill_localhost=True):
 
 class UDPSerializer(object):
     def __init__(self, addr):
-        self.addr = addr
+        (hostname, port) = addr
+        if not hostname:
+            hostname = 'localhost'
+        self.addr = (hostname, port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     def emit(self, code, *args):
         self.sock.sendto(json.dumps([code] + list(args)), self.addr)
@@ -74,10 +75,10 @@ def run_stdin_deserializer(cb):
             args = json.loads(data)
             cb(*args)
 
-def run_udpsock_deserializer(port, cb):
+def run_udpsock_deserializer(addr, cb):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(('', port))
+    sock.bind(addr)
     while True:
         args = json.loads(sock.recv(1024))
         cb(*args)

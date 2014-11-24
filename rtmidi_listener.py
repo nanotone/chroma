@@ -9,8 +9,7 @@ class RtMidiListener(object):
         self.mi = rtmidi.MidiIn()
         ports = self.mi.ports
         if not ports:
-            logging.warning("No MIDI input ports found")
-            sys.exit()
+            raise IndexError("No MIDI input ports found")
         if len(ports) == 1:
             idx = 0
             logging.info("Choosing MIDI input port %s", ports[0])
