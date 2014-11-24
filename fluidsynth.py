@@ -1,12 +1,14 @@
+import logging
 import os
 import subprocess
 
 class FluidSynth(object):
     def __init__(self):
         sounds = os.listdir('sounds/sf2')
-        for sound in ('FluidR3_GM',):
+        for sound in 'acoustic_grand_piano_ydp_20080910 acoustic_piano_imis_1 TimGM6mb FluidR3_GM'.split():
             sound = '%s.sf2' % sound
             if sound in sounds:
+                logging.info("Using SoundFont file %s", sound)
                 break
         else:
             if not sounds:
