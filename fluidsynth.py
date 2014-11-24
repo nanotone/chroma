@@ -1,6 +1,8 @@
-import logging
 import os
 import subprocess
+
+import simple_logging as logging
+
 
 class FluidSynth(object):
     def __init__(self):

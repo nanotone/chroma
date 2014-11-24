@@ -1,6 +1,6 @@
-import logging
-
 import rtmidi_python as rtmidi
+
+import simple_logging as logging
 
 
 class RtMidiListener(object):

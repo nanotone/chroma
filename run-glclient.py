@@ -1,6 +1,5 @@
 import argparse
 import contextlib
-import logging
 import math
 import re
 import subprocess
@@ -13,6 +12,7 @@ from OpenGL.GLU import *
 import engine
 import glfw_app
 import pipeutil
+import simple_logging as logging
 
 HEXCOLORS = ['#40FF40', '#00FFFF', '#20A0FF', '#4080FF', # G C
              '#8060FF', '#C040E0', '#FF0080', '#FF0040', # B M

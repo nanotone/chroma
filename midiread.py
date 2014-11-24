@@ -1,5 +1,4 @@
 import bisect
-import logging
 import time
 import traceback
 
@@ -10,6 +9,7 @@ from midi.MidiOutStream import MidiOutStream
 
 import pipeutil
 import rtmidi_listener
+import simple_logging as logging
 
 NOTE_OFF = 0x80
 NOTE_ON = 0x90
