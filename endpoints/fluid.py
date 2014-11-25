@@ -22,7 +22,7 @@ class FluidSynth(object):
         if code == 0x90:
             cmd = 'noteon 0 %d %d' % tuple(args)
         elif code == 0x80:
-            cmd = 'noteoff 0 %d' % tuple(args)
+            cmd = 'noteoff 0 %d' % args[0]
         elif code == 0xB0:
             cmd = 'cc 0 %d %d' % tuple(args)
         self.proc.stdin.write(cmd + '\n')
