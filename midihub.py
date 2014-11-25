@@ -1,7 +1,9 @@
+#!/usr/bin/env python
+
 import importlib
 import traceback
 
-import simple_logging as logging
+import midihub.simple_logging as logging
 
 def make_midi_dst(arg):
     if arg == '-':
@@ -10,9 +12,9 @@ def make_midi_dst(arg):
         arg = 'smf://' + arg
     (scheme, arg) = arg.split(':', 1)
     try:
-        module = importlib.import_module('endpoints.' + scheme)
+        module = importlib.import_module('midihub.endpoints.' + scheme)
     except ImportError:
-        raise ImportError("Unrecognized MIDI sink: module endpoints.%s not found" % scheme)
+        raise ImportError("Unrecognized MIDI sink: module midihub.endpoints.%s not found" % scheme)
     return module.make_dst(arg[2:])
 
 
@@ -35,10 +37,10 @@ def main(args):
             src = 'smf://' + src
         (scheme, arg) = src.split(':', 1)
         try:
-            module = importlib.import_module('endpoints.' + scheme)
+            module = importlib.import_module('midihub.endpoints.' + scheme)
             module.run_src(arg[2:], emit)
         except ImportError:
-            raise ImportError("Unrecognized MIDI source: module endpoints.%s not found" % scheme)
+            raise ImportError("Unrecognized MIDI source: module midihub.endpoints.%s not found" % scheme)
     finally:
         for s in sinks: s.eof()
 

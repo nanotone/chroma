@@ -11,8 +11,8 @@ from OpenGL.GLU import *
 
 import engine
 import glfw_app
-import simple_logging as logging
-import endpoints.pipe
+import midihub.simple_logging as logging
+import midihub.endpoints.pipe
 
 HEXCOLORS = ['#40FF40', '#00FFFF', '#20A0FF', '#4080FF', # G C
              '#8060FF', '#C040E0', '#FF0080', '#FF0040', # B M
@@ -164,7 +164,7 @@ def midi_cb(code, *args):
 
 
 def main(args):
-    read_thread = threading.Thread(target=endpoints.pipe.run_src, args=('', midi_cb,))
+    read_thread = threading.Thread(target=midihub.endpoints.pipe.run_src, args=('', midi_cb,))
     read_thread.daemon = True
     read_thread.start()
     try:
