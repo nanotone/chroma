@@ -28,32 +28,40 @@ def tick():
 
 class Note(object):
     def __init__(self, midipitch, volume):
+        self.midipitch = midipitch
+        self.volume = volume  # original volume. everything eventually gets multiplied by this
         self.pitch_coords = coords_for_midipitch(midipitch)
         self.start = now      # when note_on happened
-        self.volume = volume  # original volume. everything eventually gets multiplied by this
-        self.damper_start = 0
-        self.damper_level = 1.0
-        self.accum = 1.0
+        self.released = False
+        self.audible = True
+        self.pedal = 1.0
+        self.weight = 1.0
+        self.max_sustain = 25 * 0.8 ** ((midipitch - 12) / 12.0)
+        self.min_sustain = 0.75
+        self.decayed_weight = volume  # integral of Dirac delta over [0, eps]
+        self.last_decay = now
 
-    def release_with_damper(self, damper_level):
-        self.damper_level = damper_level
-        self.accum += (now - self.start) * TIME_SCALE
-        self.damper_start = now
+    def release_with_pedal(self, pedal):
+        self.released = True
+        self.pedal = pedal
 
-    def set_damper(self, damper_level):
-        if self.damper_start and damper_level < self.damper_level:
-            self.accum += (now - self.damper_start) * TIME_SCALE * self.damper_level
-            self.damper_level = damper_level
-            self.damper_start = now
+    def set_pedal(self, pedal):
+        if self.released:
+            self.pedal = pedal
 
     def get_decayed_coords(self):
-        total_age = (now - self.start) * TIME_SCALE
-        if self.damper_start:
-            elapsed = (now - self.damper_start) * TIME_SCALE
-        else:
-            elapsed = total_age
-        weight = math.exp(-total_age) * (self.accum + self.damper_level * elapsed) * self.volume
-        return (self.pitch_coords[0] * weight, self.pitch_coords[1] * weight)
+        elapsed = now - self.last_decay
+        if elapsed:
+            if self.audible:
+                sustain = self.min_sustain + (self.max_sustain - self.min_sustain) * self.pedal
+                self.weight *= 0.002 ** (elapsed / sustain)
+                amplitude = self.weight * self.volume
+                self.decayed_weight += elapsed * amplitude
+                if amplitude < 0.001:
+                    self.audible = False
+            self.decayed_weight *= math.exp(-elapsed * TIME_SCALE)
+            self.last_decay = now
+        return (self.pitch_coords[0] * self.decayed_weight, self.pitch_coords[1] * self.decayed_weight)
 
 
 class Engine(object):
@@ -61,7 +69,7 @@ class Engine(object):
         self.notes = {}
         self.reverb_center = [0, 0]
         self.reverb_center_updated = 0
-        self.damper_level = 0
+        self.pedal = 0
         self.notes_updated = 0
         self.notes_need_update = False
 
@@ -73,46 +81,44 @@ class Engine(object):
             self.reverb_center[1] *= decay_factor
             self.reverb_center_updated = now
 
-    def get_center(self):
+    def update(self):
         self.decay_reverb_center()
-        coords = [note.get_decayed_coords() for note in self.notes.itervalues()] + [self.reverb_center]
-        return map(sum, zip(*coords))
+        coords = [self.reverb_center]
+        inaudible_notes = []
+        for note in self.notes.itervalues():
+            coords.append(note.get_decayed_coords())
+            if not note.audible:
+                inaudible_notes.append(note)
+        self.center = map(sum, zip(*coords))
+        for note in inaudible_notes:
+            self.delete_note(note)
 
-    def delete_note(self, midipitch):
+    def delete_note(self, note):
         # add finished note to reverb
-        note = self.notes.get(midipitch)
-        if note:
-            coords = note.get_decayed_coords()
-            self.decay_reverb_center()
-            self.reverb_center[0] += coords[0]
-            self.reverb_center[1] += coords[1]
-            del self.notes[midipitch]
+        coords = note.get_decayed_coords()
+        self.decay_reverb_center()
+        self.reverb_center[0] += coords[0]
+        self.reverb_center[1] += coords[1]
+        del self.notes[note.midipitch]
 
     def damper(self, controller, state):
-        if controller != 0x40: return  # only handle sustain pedal for now
+        if controller != 0x40:
+            return  # only handle sustain pedal for now
         state /= 127.0
-        if state < self.damper_level:
-            if state:
-                for note in self.notes.itervalues():
-                    note.set_damper(state)
-            else:  # sec
-                for (midipitch, note) in self.notes.items():
-                    if note.damper_start:
-                        self.delete_note(midipitch)
-        self.damper_level = state
+        for note in self.notes.itervalues():
+            note.set_pedal(state)
+        self.pedal = state
 
     def note_on(self, midipitch, state):
         state /= 127.0
-        if midipitch in self.notes:
-            self.delete_note(midipitch)
+        note = self.notes.get(midipitch)
+        if note:
+            self.delete_note(note)
         self.notes[midipitch] = Note(midipitch, state)
         self.notes_need_update = True
 
     def note_off(self, midipitch, state=0):
         note = self.notes.get(midipitch)
         if note:
-            if self.damper_level:
-                note.release_with_damper(self.damper_level)
-            else:
-                self.delete_note(midipitch)
+            note.release_with_pedal(self.pedal)
 

@@ -1,7 +1,5 @@
 import argparse
-import contextlib
 import json
-import logging
 import math
 import re
 import subprocess
@@ -14,22 +12,16 @@ from OpenGL.GLU import *
 
 import engine
 import glfw_app
+from glutils import *
 
-HEXCOLORS = ['#40FF40', '#00FFFF', '#20A0FF', '#4080FF', # G C
-             '#8060FF', '#C040E0', '#FF0080', '#FF0040', # B M
-             '#FF4020', '#FF8000', '#FFFF00', '#80FF00'] # ROY
+HEXCOLORS = ['#40FF40', '#00FFFF', '#20A0FF', '#4080FF', # G_C_
+             '#8060FF', '#C040E0', '#FF0080', '#FF0040', # BvM_
+             '#FF4020', '#FF8000', '#FFFF00', '#80FF00'] # RoY_
 def rgb_from_hexcolor(hexcolor):
     return (int(hexcolor[1:3], 16) / 255.0, int(hexcolor[3:5], 16) / 255.0, int(hexcolor[5:7], 16) / 255.0)
 RGB_COLORS = map(rgb_from_hexcolor, HEXCOLORS)
 
 engine_lock = threading.Lock()
-
-@contextlib.contextmanager
-def translated(x, y, z):
-    glPushMatrix()
-    glTranslatef(x, y, z)
-    yield
-    glPopMatrix()
 
 class Renderer(object):
     def __init__(self, width, height):
@@ -48,7 +40,7 @@ class Renderer(object):
     def set_viz(self, viz):
         if isinstance(viz, int):
             viz = self.visual_modes[viz]
-        logging.info("Setting visualizer to '%s'", viz)
+        print "Setting visualizer to '%s'" % viz
         self.viz = viz
         getattr(self, 'setup_' + viz)()
 
@@ -116,12 +108,13 @@ class Renderer(object):
     def request_update(self):
         if midi_engine.notes_need_update or time.time() - self.last_update > 0.03:
             engine.tick()
-            (cx, cy) = midi_engine.get_center()
+            midi_engine.update()
+            (cx, cy) = midi_engine.center
             scale = 1.2 / (math.hypot(cx, cy) + 1)
             (cx, cy) = (scale * cx, scale * cy)
             for note in midi_engine.notes.itervalues():
                 note.render_age = engine.now - note.start
-                note.render_decay = math.exp(-note.render_age * 0.5) * note.damper_level
+                note.render_decay = min(note.weight, 1.0)
                 note.render_pos = (note.pitch_coords[0] + cx, note.pitch_coords[1] + cy)
             elapsed = engine.now - self.last_update
             self.last_update = engine.now
@@ -161,7 +154,7 @@ def midi_cb(code, *args):
         if func:
             func(*args)
         else:
-            logging.warning("Unhandled MIDI event", code, args)
+            print "Unhandled MIDI event", code, args
 
 
 def run():
@@ -180,14 +173,14 @@ def main(args):
         match = re.search(r'Resolution:\s*(\d+) [Xx] (\d+)',
                           subprocess.check_output(['system_profiler', 'SPDisplaysDataType']))
         (width, height) = [int(match.group(i)) for i in (1, 2)]
-        logging.info("Creating GLFW app")
+        print "Creating GLFW app"
         app = glfw_app.GlfwApp("Chromatics", width, height, args.fullscreen)
     except glfw_app.GlfwError as e:
-        logging.error(e.message)
+        print "Error:", e.message
         return
     renderer = Renderer(width, height)
     renderer.set_viz('spiral')
-    logging.info("Entering render loop")
+    print "Entering render loop"
     app.key_callbacks.append(renderer.key_cb)
     app.run(renderer.render_frame)
 
