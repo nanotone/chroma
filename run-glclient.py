@@ -210,7 +210,7 @@ class Renderer(object):
                     alpha = min(norm_weight, 1.0)
                 else:
                     alpha = n.weight * pressed_note.weight
-                color = color + [alpha ** 0.3]
+                color = color + [alpha ** 0.33]
                 glColor4f(*color)
                 with translated(*n.firefly['pos']):
                     gluDisk(self.quadric, 0, 4*n.volume**2, 19, 1)
