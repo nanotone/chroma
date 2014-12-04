@@ -24,22 +24,21 @@ class GlfwApp(object):
 
     def run(self, render_frame):
         try:
-            frames_rendered = 0
-            start = time.time()
-            fps = 0
+            prev = start = time.time()
+            avg_elapsed = 0
+            avg_render_elapsed = 0
             while not glfw.window_should_close(self.win):
+                time0 = time.time()
                 render_frame()
+                avg_render_elapsed = avg_render_elapsed * 0.9 + (time.time() - time0) * 0.1
                 glfw.swap_buffers(self.win)
                 glfw.poll_events()
-                frames_rendered += 1
                 now = time.time()
+                avg_elapsed = avg_elapsed * 0.9 + (now - prev) * 0.1
+                prev = now
                 if now - start >= 1.0:
-                    new_fps = int(round(frames_rendered / (now - start)))
-                    if new_fps != fps:
-                        fps = new_fps
-                        print fps, "fps"
-                    start = time.time()
-                    frames_rendered = 0
+                    print "%.1f fps, %.1f%% spent in render" % (1/avg_elapsed, 100*avg_render_elapsed/avg_elapsed)
+                    start = now
         finally:
             glfw.destroy_window(self.win)
             glfw.terminate()
