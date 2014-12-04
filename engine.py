@@ -6,10 +6,6 @@ TIME_SCALE = 1/2.0  # takes 2 seconds for a note to decay e-fold
 
 PC_RADS = 2 * math.pi / 12
 
-
-def weighted_avg_colors(color1, color2, w1):
-    return [w1*c1 + (1-w1)*c2 for (c1, c2) in zip(color1, color2)]
-
 coords_for_pitch_class = {
     pitch_class: [math.cos(pitch_class * PC_RADS),
                   math.sin(pitch_class * PC_RADS)]
