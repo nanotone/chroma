@@ -178,6 +178,7 @@ class Renderer(object):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         self.notes = []  # make sure to render this in chronological order
         self.notes_by_midipitch = {n: [] for n in range(21, 109)}
+        self.note_density = 0
 
     def render_firefly(self):
         glClear(GL_COLOR_BUFFER_BIT)
@@ -198,6 +199,7 @@ class Renderer(object):
                         for n in prev_notes[1:]:
                             n.weight *= prev_notes[0].weight
                     prev_notes.insert(0, note)
+                    self.note_density += 1
             for n in reversed(self.notes):
                 color = n.firefly['color']
                 pressed_note = self.notes_by_midipitch[n.midipitch][0]
@@ -212,13 +214,14 @@ class Renderer(object):
                 glColor4f(*color)
                 with translated(*n.firefly['pos']):
                     gluDisk(self.quadric, 0, 4*n.volume**2, 19, 1)
+        self.note_density *= math.exp(-self.frame_elapsed)  # ranges from 0 to 20
         for n in self.notes:
             n.firefly['xvel'] += random.triangular(-0.5, 0.5) * self.frame_elapsed
             n.firefly['xvel'] = min(5, max(-5, n.firefly['xvel']))
             n.firefly['yvel'] += random.triangular(-0.5, 0.5) * self.frame_elapsed
             n.firefly['yvel'] = min(5, max(-5, n.firefly['yvel']))
             n.firefly['pos'][0] += n.firefly['xvel'] * self.frame_elapsed
-            n.firefly['pos'][1] += (8 + n.firefly['yvel']) * self.frame_elapsed
+            n.firefly['pos'][1] += (5 + 2*math.log1p(self.note_density) + n.firefly['yvel']) * self.frame_elapsed
         remove = [n for n in self.notes if n.firefly['pos'][1] > 88]
         for n in remove:
             self.notes.remove(n)
