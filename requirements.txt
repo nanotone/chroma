@@ -1,5 +1,6 @@
 PyOpenGL==3.1.0
 PyOpenGL-accelerate==3.1.0
 glfw==1.1.1
--e git+https://github.com/nanotone/midihub.git@3cb65514b32fbb93baed910846218828cb10b68e#egg=midihub-master
+-e git+https://github.com/nanotone/midihub.git@bbe98a25c099da56e75d1523945b639119b32b78#egg=midihub-master
+numpy==1.9.1
 rtmidi-python==0.2.2
