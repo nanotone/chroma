@@ -52,8 +52,8 @@ class KeyboardViz(object):
     def __init__(self, scope):
         self.scope = scope
         self.verts = make_array_buffer([
-            [.1, 0, 0], [.9, 0, 0], [.9, 1, 0], [.1, 1, 0],
-            [-.2, 0, 0], [1.2, 0, 0], [1.2, 1, 0], [-.2, 1, 0],
+            [-.4, 0, 0], [.4, 0, 0], [.4, 1, 0], [-.4, 1, 0],
+            [-.7, 0, 0], [.7, 0, 0], [.7, 1, 0], [-.7, 1, 0],
         ])
         self.colors = make_array_buffer([[1,1,1,1]] * 4 + [[1,1,1,0]] * 4)
         self.indices = make_index_buffer([[0, 1, 2, 3], [4, 0, 3, 7], [1, 5, 6, 2]])
@@ -80,22 +80,22 @@ class KeyboardViz(object):
                 (color, norm_weight) = self.scope.get_note_color(note)
                 if norm_weight > 1:
                     color = apply_whitening_bonus(color, norm_weight)
-                    color.append(1)
-                else:
-                    color.append(norm_weight * math.exp(norm_weight - 1))
+                alpha = min(1.0, norm_weight)
                 for i in range(3):
                     self.colors.data[:,i].fill(color[i])
-                self.colors.data[:4,3].fill(color[3])
+                self.colors.data[:4,3].fill(alpha)
                 self.colors.set_array(self.colors.data)
-                with translated(pitch, 0, 0):
-                    with self.verts:
-                        glVertexPointer(3, GL_FLOAT, 0, self.verts)
-                    with self.colors:
-                        glColorPointer(4, GL_FLOAT, 0, self.colors)
-                    with self.indices:
-                        #glEnableVertexAttribArray(0)
-                        #glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, None)
-                        glDrawElements(GL_QUADS, 12, GL_UNSIGNED_INT, None)
+                with translated(pitch + 0.5, 0, 0):
+                    size = min(1.0, max(1.0, norm_weight) * note.weight ** 0.3)
+                    with scaled(size, 1.0, 1.0):
+                        with self.verts:
+                            glVertexPointer(3, GL_FLOAT, 0, self.verts)
+                        with self.colors:
+                            glColorPointer(4, GL_FLOAT, 0, self.colors)
+                        with self.indices:
+                            #glEnableVertexAttribArray(0)
+                            #glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, None)
+                            glDrawElements(GL_QUADS, 12, GL_UNSIGNED_INT, None)
 
 
 class SpiralViz(object):
@@ -331,7 +331,7 @@ def main(args):
         print "Error:", e.message
         return
     renderer = Renderer(width, height)
-    renderer.set_viz('firefly')
+    renderer.set_viz('keyboard')
     print "Entering render loop"
     app.key_callbacks.append(renderer.key_cb)
     app.run(renderer.render_frame)
