@@ -80,13 +80,13 @@ class KeyboardViz(object):
                 (color, norm_weight) = self.scope.get_note_color(note)
                 if norm_weight > 1:
                     color = apply_whitening_bonus(color, norm_weight)
-                alpha = min(1.0, norm_weight)
+                alpha = min(1.0, norm_weight) ** 1.5
                 for i in range(3):
                     self.colors.data[:,i].fill(color[i])
                 self.colors.data[:4,3].fill(alpha)
                 self.colors.set_array(self.colors.data)
                 with translated(pitch + 0.5, 0, 0):
-                    size = min(1.0, max(1.0, norm_weight) * note.weight ** 0.3)
+                    size = min(1.0, max(1.0, norm_weight) * note.weight ** 0.5)
                     with scaled(size, 1.0, 1.0):
                         with self.verts:
                             glVertexPointer(3, GL_FLOAT, 0, self.verts)
@@ -113,6 +113,9 @@ class SpiralViz(object):
         glDisable(GL_DEPTH_TEST)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
+        glDisableClientState(GL_VERTEX_ARRAY)
+        glDisableClientState(GL_COLOR_ARRAY)
+
     def render(self):
         glClear(GL_COLOR_BUFFER_BIT)
         glLoadIdentity()
@@ -122,7 +125,35 @@ class SpiralViz(object):
         with engine_lock:
             self.scope.request_update()
             for (midipitch, note) in midi_engine.notes.items():
-                pitch = midipitch - 21
+                if not hasattr(note, 'spiral'):
+                    note.spiral = {
+                        'prev_weight': 1.0,
+                        'components': [0, 0, 0],  # dry, mid, wet
+                        'inner': 0,
+                    }
+                dweight = note.spiral['prev_weight'] - note.weight
+                if note.pedal < 0.25:
+                    pro = (note.pedal / 0.25) * 0.9 + 0.1
+                    comp_weights = [1 - pro, pro, 0]
+                else:
+                    pro = (note.pedal - 0.25) / 0.75 * 0.9
+                    comp_weights = [0, 1 - pro, pro]
+                if note.spiral['inner']:
+                    comp_weights[0] += 1
+                else:
+                    comp_weights[0] *= note.weight ** 2
+                comp_total = sum(comp_weights)
+                for (i, comp_weight) in enumerate(comp_weights):
+                    note.spiral['components'][i] += dweight * comp_weight / comp_total
+                note.spiral['prev_weight'] = note.weight
+
+                comp_sum = sum(note.spiral['components'])
+                if comp_sum:
+                    log_weight = math.log(note.weight)
+                    (dry, mid, wet) = [math.exp(log_weight * comp / comp_sum) for comp in note.spiral['components']]
+                else:
+                    (dry, mid, wet) = (1, 1, 1)
+
                 (color, norm_weight) = self.scope.get_note_color(note)
                 if norm_weight > 1:
                     color = apply_whitening_bonus(color, norm_weight)
@@ -130,16 +161,23 @@ class SpiralViz(object):
                 else:
                     color.append(norm_weight * math.exp(norm_weight - 1))
                 glColor4f(*color)
-                self.draw_spiral_pitch(pitch)
+                size = mid * (1.0 + (note.weight * note.volume)**3)
+                inner = 0 if dry > 0.67 else 1 - dry/3
+                note.spiral['inner'] = inner
+                self.draw_spiral_pitch(midipitch - 21, inner=size * inner, outer=size, nice_slices=True)
 
-    def draw_spiral_pitch(self, pitch):
+    def draw_spiral_pitch(self, pitch, inner=0.0, outer=1.0, nice_slices=False):
         # use a logarithmic spiral, discretized to circle of fifths
         theta = 2*math.pi * 5.03/12 * pitch  # skewed 5/12, so each pitch class also gets a slight spiral
         r = 1.3 * (0.97 ** pitch)
         r /= (pitch / 88.0 + 1)  # gradually make higher notes 2x closer/smaller
         size = r * 0.24
+        slices = int(60 - 10 * math.log(pitch + 10))
+        if not nice_slices:
+            slices = min(19, slices)
         with translated(r * math.cos(theta), r * math.sin(theta), 0):
-            gluDisk(self.quadric, 0, size, 19, 1)
+            with scaled(size):
+                gluDisk(self.quadric, inner, outer, slices, 1)
 
 
 class FireflyViz(object):
