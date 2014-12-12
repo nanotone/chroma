@@ -119,7 +119,7 @@ class SpiralViz(object):
     def render(self):
         glClear(GL_COLOR_BUFFER_BIT)
         glLoadIdentity()
-        glColor3f(.05, .05, .05)
+        glColor3f(0.07, 0.07, 0.07)
         for pitch in xrange(88):
             self.draw_spiral_pitch(pitch)
         with engine_lock:
@@ -286,11 +286,12 @@ class Renderer(object):
             'firefly': FireflyViz(self),
         }
         self.quadric = gluNewQuadric()
+        self.events = []
 
     def key_cb(self, window, key, scancode, action, mods):
         #print window, key, scancode, action, mods
         if key == glfw_app.glfw.KEY_SPACE and action == glfw_app.glfw.PRESS:
-            self.set_viz((self.visual_modes.index(self.viz) + 1) % len(self.visual_modes))
+            self.events.append('switch_viz')
 
     def set_viz(self, viz):
         if isinstance(viz, int):
@@ -301,6 +302,11 @@ class Renderer(object):
         self.last_render = time.time()
 
     def render_frame(self):
+        if self.events:
+            for event in self.events:
+                if event == 'switch_viz':
+                    self.set_viz((self.visual_modes.index(self.viz) + 1) % len(self.visual_modes))
+            self.events = []
         now = time.time()
         self.frame_elapsed = now - self.last_render
         self.last_render = now
@@ -337,25 +343,26 @@ class Renderer(object):
 
 
 midi_engine = engine.Engine()
-def midi_cb(code, *args):
-    engine.tick()
-    with engine_lock:
-        func = getattr(midi_engine, {0x80: 'note_off', 0x90: 'note_on', 0xB0: 'damper'}[code], None)
-        if func:
-            func(*args)
-        else:
-            print "Unhandled MIDI event", code, args
-
 
 def run():
     while True:
         data = sys.stdin.readline().strip()
         if data:
             args = json.loads(data)
-            midi_cb(*args)
+            engine.tick()
+            with engine_lock:
+                func = getattr(midi_engine, {0x80: 'note_off', 0x90: 'note_on', 0xB0: 'damper'}[args[0]], None)
+                if func:
+                    func(*args[1:])
+                else:
+                    print "Unhandled MIDI event", args
+            if args[0] == 0xB0 and args[1] == 0x42 and args[2] == 0:
+                renderer.events.append('switch_viz')
+
 
 
 def main(args):
+    global renderer
     read_thread = threading.Thread(target=run)
     read_thread.daemon = True
     read_thread.start()
