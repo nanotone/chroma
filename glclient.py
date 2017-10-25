@@ -367,9 +367,12 @@ def main(args):
     read_thread.daemon = True
     read_thread.start()
     try:
-        match = re.search(r'Resolution:\s*(\d+) [Xx] (\d+)',
+        match = re.search(r'Resolution:\s*(\d+) [Xx] (\d+)(.*)',
                           subprocess.check_output(['system_profiler', 'SPDisplaysDataType']).decode('ascii'))
         (width, height) = [int(match.group(i)) for i in (1, 2)]
+        if 'Retina' in match.group(3):
+            width //= 2
+            height //= 2
         print("Creating GLFW app")
         app = glfw_app.GlfwApp("Chromatics", width, height, args.fullscreen)
     except glfw_app.GlfwError as e:
