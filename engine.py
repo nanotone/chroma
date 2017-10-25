@@ -9,7 +9,7 @@ PC_RADS = 2 * math.pi / 12
 coords_for_pitch_class = {
     pitch_class: [math.cos(pitch_class * PC_RADS),
                   math.sin(pitch_class * PC_RADS)]
-    for pitch_class in xrange(12)
+    for pitch_class in range(12)
 }
 def coords_for_midipitch(midipitch):
     return coords_for_pitch_class[midipitch * 7 % 12]
@@ -81,11 +81,11 @@ class Engine(object):
         self.decay_reverb_center()
         coords = [self.reverb_center]
         inaudible_notes = []
-        for note in self.notes.itervalues():
+        for note in self.notes.values():
             coords.append(note.get_decayed_coords())
             if not note.audible:
                 inaudible_notes.append(note)
-        self.center = map(sum, zip(*coords))
+        self.center = [sum(c) for c in zip(*coords)]
         for note in inaudible_notes:
             self.delete_note(note)
 
@@ -101,7 +101,7 @@ class Engine(object):
         if controller != 0x40:
             return  # only handle sustain pedal for now
         state /= 127.0
-        for note in self.notes.itervalues():
+        for note in self.notes.values():
             note.set_pedal(state)
         self.pedal = state
 

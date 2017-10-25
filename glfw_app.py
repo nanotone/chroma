@@ -37,7 +37,7 @@ class GlfwApp(object):
                 avg_elapsed = avg_elapsed * 0.9 + (now - prev) * 0.1
                 prev = now
                 if now - start >= 1.0:
-                    print "%.1f fps, %.1f%% spent in render" % (1/avg_elapsed, 100*avg_render_elapsed/avg_elapsed)
+                    print("%.1f fps, %.1f%% spent in render" % (1/avg_elapsed, 100*avg_render_elapsed/avg_elapsed))
                     start = now
         finally:
             glfw.destroy_window(self.win)

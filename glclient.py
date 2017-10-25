@@ -28,7 +28,7 @@ HEXCOLORS = ['#40FF40', '#00FFFF', '#20A0FF', '#4080FF', # G_C_
              '#FF4020', '#FF8000', '#FFFF00', '#80FF00'] # RoY_
 def rgb_from_hexcolor(hexcolor):
     return (int(hexcolor[1:3], 16) / 255.0, int(hexcolor[3:5], 16) / 255.0, int(hexcolor[5:7], 16) / 255.0)
-RGB_COLORS = map(rgb_from_hexcolor, HEXCOLORS)
+RGB_COLORS = [rgb_from_hexcolor(c) for c in HEXCOLORS]
 
 def weighted_avg_colors(color1, color2, w1):
     """interp from color1 to color2 as w1 goes from 0 to 1"""
@@ -120,7 +120,7 @@ class SpiralViz(object):
         glClear(GL_COLOR_BUFFER_BIT)
         glLoadIdentity()
         glColor3f(0.07, 0.07, 0.07)
-        for pitch in xrange(88):
+        for pitch in range(88):
             self.draw_spiral_pitch(pitch)
         with engine_lock:
             self.scope.request_update()
@@ -186,14 +186,14 @@ class FireflyViz(object):
         self.quadric = gluNewQuadric()
         anglestep = 2*math.pi/19
         self.verts = make_array_buffer(
-            [[math.cos(i*anglestep)*.5, math.sin(i*anglestep)*.5, 0] for i in xrange(19)]  # inner ring
-          + [[math.cos(i*anglestep)   , math.sin(i*anglestep)   , 0] for i in xrange(19)]  # outer ring
+            [[math.cos(i*anglestep)*.5, math.sin(i*anglestep)*.5, 0] for i in range(19)]  # inner ring
+          + [[math.cos(i*anglestep)   , math.sin(i*anglestep)   , 0] for i in range(19)]  # outer ring
           + [[0, 0, 0]])
         self.colors = make_array_buffer([[1, 1, 1, 0]] * 39)
         self.indices = make_index_buffer(
-            [[38, i, (i+1)%19] for i in xrange(19)]  # inner layer
-          + [[i, i+19, (i+1)%19+19] for i in xrange(19)]  # outer layer part 1
-          + [[i, (i+1)%19+19, (i+1)%19] for i in xrange(19)]  # outer layer part 2
+            [[38, i, (i+1)%19] for i in range(19)]  # inner layer
+          + [[i, i+19, (i+1)%19+19] for i in range(19)]  # outer layer part 1
+          + [[i, (i+1)%19+19, (i+1)%19] for i in range(19)]  # outer layer part 2
         )
 
     def setup(self):
@@ -219,7 +219,7 @@ class FireflyViz(object):
         glLoadIdentity()
         with engine_lock:
             self.scope.request_update()
-            for note in midi_engine.notes.itervalues():
+            for note in midi_engine.notes.values():
                 if not hasattr(note, 'firefly'):
                     note.firefly = {
                         'pos': [note.midipitch - 21, 0, 0],
@@ -296,7 +296,7 @@ class Renderer(object):
     def set_viz(self, viz):
         if isinstance(viz, int):
             viz = self.visual_modes[viz]
-        print "Setting visualizer to '%s'" % viz
+        print("Setting visualizer to '{}'".format(viz))
         self.viz = viz
         self.visualizers[viz].setup()
         self.last_render = time.time()
@@ -318,13 +318,13 @@ class Renderer(object):
         (cx, cy) = midi_engine.center
         scale = 1.2 / (math.hypot(cx, cy) + 1)
         (self.cx, self.cy) = (scale * cx, scale * cy)
-        for note in midi_engine.notes.itervalues():
+        for note in midi_engine.notes.values():
             note.render_decay = min(note.weight, 1.0)
         elapsed = engine.now - self.last_update
         self.last_update = engine.now
         midi_engine.notes_need_update = False
         # now find second weightiest note
-        note_weights = sorted(n.render_decay * n.volume for n in midi_engine.notes.itervalues())
+        note_weights = sorted(n.render_decay * n.volume for n in midi_engine.notes.values())
         top_2nd_note_weight = (note_weights[-2:] + [0])[0]
         self.top_2nd_note_weight = max(self.top_2nd_note_weight * math.exp(-elapsed/5.0),
                                        top_2nd_note_weight, 0.3)
@@ -355,7 +355,7 @@ def run():
                 if func:
                     func(*args[1:])
                 else:
-                    print "Unhandled MIDI event", args
+                    print("Unhandled MIDI event", args)
             if args[0] == 0xB0 and args[1] == 0x42 and args[2] == 0:
                 renderer.events.append('switch_viz')
 
@@ -368,16 +368,16 @@ def main(args):
     read_thread.start()
     try:
         match = re.search(r'Resolution:\s*(\d+) [Xx] (\d+)',
-                          subprocess.check_output(['system_profiler', 'SPDisplaysDataType']))
+                          subprocess.check_output(['system_profiler', 'SPDisplaysDataType']).decode('ascii'))
         (width, height) = [int(match.group(i)) for i in (1, 2)]
-        print "Creating GLFW app"
+        print("Creating GLFW app")
         app = glfw_app.GlfwApp("Chromatics", width, height, args.fullscreen)
     except glfw_app.GlfwError as e:
-        print "Error:", e.message
+        print("Error:", e.message)
         return
     renderer = Renderer(width, height)
     renderer.set_viz('keyboard')
-    print "Entering render loop"
+    print("Entering render loop")
     app.key_callbacks.append(renderer.key_cb)
     app.run(renderer.render_frame)
 
